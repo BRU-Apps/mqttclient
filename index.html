@@ -1,0 +1,264 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <!-- CSS only -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <style>
+        #messagesOl.list-group-numbered {
+            flex-direction: column-reverse !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="bruapp">
+        <nav class="navbar navbar-light bg-light">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">BRU Apps</a>
+            </div>
+        </nav>
+        <div class="px-2 py-2 my-1 text-center">
+            <h5 class="display-6 fw-bold">MQTT Client</h5>
+            <div class="col-lg-6 mx-auto">
+                <p class="lead mb-4">Here's a simple utility app to test your mqtt server connection, topic subscription, send and receive messages</p>
+            </div>
+        </div>
+        <div class="container">
+            <!-- Content here -->
+            <div class="row justify-content-md-center">
+                <div class="col-md-6 col-lg-4">
+
+                    <div class="card mt-5 border-secondary ">
+                        <h5 class="card-title p-3">Connection Details</h5>
+                        <div class="card-body">
+                            <div v-if="connectionSuccessMesage!=null" class="alert alert-success" role="alert">
+                                {{connectionSuccessMesage}}
+                            </div>
+                            <div v-if="connectionErrorMessage!=null" class="alert alert-danger" role="alert">
+                                {{connectionErrorMessage}}
+                            </div>
+                            <label class="form-label">Host Address</label>
+                            <div class="input-group mb-3">
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" v-model="connection.host" id="hostDetails" placeholder="Host" aria-label="Host">
+                                </div>
+                                <div class="col-sm-3">
+                                    <input type="number" class="form-control" v-model="connection.port" placeholder="Port" aria-label="Port">
+                                </div>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" v-model="connection.ssl" value="true" type="checkbox" id="flexSwitchCheckDefault">
+                                <label class="form-check-label" for="flexSwitchCheckDefault">SSL</label>
+                            </div>
+                            <label class="form-label">Client ID</label>
+                            <div class="input-group mb-3">
+
+                                <input type="text" class="form-control" id="clientId" v-model="connection.clientId" placeholder="Client Id" aria-label="Client Id">
+
+                                <button class="btn btn-outline-secondary" type="button" id="button-addon2">Generate</button>
+
+                            </div>
+
+                        </div>
+                        <div class="card-body border-top">
+                            <p class="text-center">Credentials (Optional)</p>
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username</label>
+                                <input type="text" class="form-control" v-model="connection.username" id="username" placeholder="Username">
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" v-model="connection.password" id="password" placeholder="Password">
+                            </div>
+                        </div>
+                        <div class="card-body border-top text-center">
+                            <button type="button" v-on:click="connect()" class="btn btn-primary" :disabled="(connectionLoader || connection.host=='' || connection.clientId=='' || !((connection.username=='' && connection.password=='') || (connection.username!='' && connection.password!='')))">
+                                <span v-if="connectionLoader" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                Connect
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card mt-5 border-primary">
+                        <h5 class="card-title p-3">Subscribe to Topics</h5>
+                        <div class="card-body border-bottom">
+                            <label class="form-label">Add Topic</label>
+                            <div class="input-group mb-3">
+
+                                <input type="text" class="form-control" v-model="topicInput" id="clientId" placeholder="Topic" aria-label="Topic">
+
+                                <button class="btn btn-outline-secondary" v-on:click="subscribe()" :disabled="mqttClient==null || topicInput==null" type="button" id="button-addon2">Subscribe</button>
+
+                            </div>
+                            <div v-if="topics.length>0">
+                                <label class="form-label">You subscribed to</label>
+
+                                <ul class="list-group">
+                                    <li v-for="tpc in topics" class="list-group-item" v-on:click="fillTopic(tpc)">{{tpc}}</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <h5 class="card-title p-3">Send Message</h5>
+                        <div class="card-body">
+
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" v-model="message.topic" id="topic" placeholder="Topic" aria-label="Topic">
+                            </div>
+                            <div class="mb-3">
+                                <label for="exampleFormControlTextarea1" class="form-label">Message</label>
+                                <textarea class="form-control" v-model="message.message" id="exampleFormControlTextarea1" rows="3"></textarea>
+                            </div>
+                            <div class="text-center">
+                                <button type="button" :disabled="mqttClient==null || message.topic==null || message.message==null" v-on:click="sendMessage()" class="btn btn-primary">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+
+                    <div class="card mt-5 p-3 border-secondary">
+                        <h5 class="card-title">Received Messages</h5>
+                        <div class="card-body">
+                            <ol id="messagesOl" class="list-group">
+                                <li v-for="msg in messages.slice().reverse()" class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto" style="overflow: auto">
+
+                                        <div class="fw-bold">{{msg.payLoad.destinationName}} </div>
+                                        <p class="clearfix">
+                                            {{msg.payLoad.payloadString.toString()}}
+                                        </p>
+                                        <small>{{msg.time.toLocaleString()}}</small>
+                                    </div>
+
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- JavaScript Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <script src="mqttws31.min.js"></script>
+    <script src="https://unpkg.com/vue@next"></script>
+    <script>
+        const HelloVueApp = {
+            data() {
+                return {
+                    connection: {
+                        host: 'broker.mqttdashboard.com',
+                        port: 8000,
+                        ssl: false,
+                        clientId: 'Bruapp-mqttClient',
+                        username: '',
+                        password: ''
+                    },
+                    mqttClient: null,
+                    topicInput: 'testtopic/1',
+                    topics: [],
+                    message: {
+                        topic: null,
+                        message: null
+                    },
+                    messages: [],
+                    connectionLoader: false,
+                    connectionSuccessMesage: null,
+                    connectionErrorMessage: null
+                }
+            },
+            methods: {
+                connect() {
+                    this.connectionLoader = true;
+                    var conn = this.connection;
+                    console.log(conn);
+                    this.mqttClient = new Paho.MQTT.Client(conn.host, Number(conn.port), conn.clientId);
+                    this.mqttClient.onConnectionLost = this.onConnectionLost;
+                    this.mqttClient.onMessageArrived = this.onMessageArrived;
+
+                    var options = {
+                        onSuccess: this.onConnect,
+                        onFailure: this.onConnectionFail,
+                        useSSL: conn.ssl
+                    };
+                    if (conn.userName && conn.password)
+                        if (conn.userName != '' || conn.password != '') {
+                            options.userName = conn.userName;
+                            options.password = conn.password;
+                        }
+                    this.mqttClient.connect(options);
+
+                },
+
+                onConnect() {
+                    console.log('Connected!');
+                    this.connectionLoader = false;
+                    this.connectionErrorMessage = null;
+                    this.connectionSuccessMesage = 'Connected to ' + this.connection.host + ':' + this.connection.port;
+                    this.topics = [];
+                    this.messages = [];
+                },
+                onConnectionLost(obj) {
+                    console.log('Connection Lost', obj);
+                    this.connectionLoader = false;
+                    this.connectionSuccessMesage = null;
+                    this.connectionErrorMessage = 'Connection Lost - errorCode[' + obj.errorCode + '] erroeMessage[' + obj.errorMessage + ']';
+                    this.topics = [];
+                    this.messages = [];
+                },
+                onConnectionFail(obj) {
+                    console.log('Connection Fail', obj);
+                    this.connectionLoader = false;
+                    this.connectionSuccessMesage = null;
+                    this.connectionErrorMessage = 'Connection Failed - errorCode[' + obj.errorCode + '] erroeMessage[' + obj.errorMessage + ']';
+                    this.topics = [];
+                    this.messages = [];
+                },
+                onMessageArrived(obj) {
+                    console.log('Message Arrived', obj);
+                    
+                    if(this.messages.length>=5) this.messages.shift();
+                    
+                    this.messages.push({
+                        payLoad: obj,
+                        time: new Date()
+                    });
+                },
+
+                subscribe() {
+                    console.log('Subscribe', this.topicInput);
+                    this.mqttClient.subscribe(this.topicInput);
+                    this.topics.push(this.topicInput);
+                    this.topicInput = null;
+                },
+
+                unsubscribe(obj) {
+                    console.log('Unsubscribe', obj);
+                },
+
+                sendMessage() {
+                    console.log('Send Message', this.message);
+                    var message = new Paho.MQTT.Message(this.message.message);
+                    message.destinationName = this.message.topic;
+                    this.mqttClient.send(message);
+                    this.message = {
+                        topic: null,
+                        message: null
+                    };
+                },
+
+                fillTopic(tpc) {
+                    this.message.topic = tpc;
+                }
+
+
+            }
+        }
+
+        Vue.createApp(HelloVueApp).mount('#bruapp')
+    </script>
+</body>
+
+</html>
