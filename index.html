@@ -65,7 +65,7 @@
                             <p class="text-center">Credentials (Optional)</p>
                             <div class="mb-3">
                                 <label for="username" class="form-label">Username</label>
-                                <input type="text" class="form-control" v-model="connection.username" id="username" placeholder="Username">
+                                <input type="text" class="form-control" v-model="connection.userName" id="username" placeholder="Username">
                             </div>
                             <div class="mb-3">
                                 <label for="password" class="form-label">Password</label>
@@ -153,7 +153,7 @@
                         port: 8081,
                         ssl: true,
                         clientId: 'Bruapp-mqttClient',
-                        username: '',
+                        userName: '',
                         password: ''
                     },
                     mqttClient: null,
